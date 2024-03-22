@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Mod id="06134D80-740E-D775-6998-028E6E41BDA1" version="1">
+  <Properties>
+	<Name>LOC_PK_CIV6_TIMER_NAME</Name>
+	<Description>LOC_PK_CIV6_TIMER_DESCRIPTION</Description>
+	<Teaser>LOC_PK_CIV6_TIMER_TEASER</Teaser>
+	<Authors>LOC_PPK_AUTHORS</Authors>
+	<AffectsSavedGames>0</AffectsSavedGames>
+	<CompatibleVersions>1.2,2.0</CompatibleVersions>
+  </Properties>
+  <InGameActions>
+    <AddUserInterfaces id="PKTimer_UI">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>PKTimer.xml</File>
+    </AddUserInterfaces>
+  </InGameActions>
+  <Files>
+	<File>PKTimer.lua</File>
+	<File>PKTimer.xml</File>
+  </Files>
+  <LocalizedText>
+  	<Text id="LOC_PPK_AUTHORS">
+  		<en_US>[COLOR:ResCultureLabelCS]Handsome Kai(Pipikai)[ENDCOLOR]</en_US>
+  		<zh_Hant_HK>[COLOR:ResCultureLabelCS]帅气的凯（皮皮凯）[ENDCOLOR]</zh_Hant_HK>
+  		<zh_Hans_CN>[COLOR:ResCultureLabelCS]帅气的凯（皮皮凯）[ENDCOLOR]</zh_Hans_CN>
+  		<ja_JP>[COLOR:ResCultureLabelCS]帅气的凯「皮皮凯」[ENDCOLOR]</ja_JP>
+  	</Text>
+  	<Text id="LOC_PK_CIV6_TIMER_NAME">
+  		<en_US>[COLOR:ResCultureLabelCS]PK[ENDCOLOR]'s Timer</en_US>
+  		<zh_Hans_CN>[COLOR:ResCultureLabelCS]皮凯[ENDCOLOR]的文明6计时器测试</zh_Hans_CN>
+  	</Text>
+  	<Text id="LOC_PK_CIV6_TIMER_TEASER">
+  		<en_US></en_US>
+  		<zh_Hans_CN>计时器测试</zh_Hans_CN>
+  	</Text>
+  	<Text id="LOC_PK_CIV6_TIMER_DESCRIPTION">
+  		<en_US></en_US>
+  		<zh_Hans_CN>计时器测试</zh_Hans_CN>
+  	</Text>
+  </LocalizedText>
+</Mod>

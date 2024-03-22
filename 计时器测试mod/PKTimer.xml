@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PK_CIV6_Timer -->
+<!-- Author: 皮皮凯 -->
+<Context Name="PKTimer">
+	<Container Size="0,0" Anchor="C,C" Hidden="1">
+		<Stack	ID="TimeStack" Anchor="C,C"/>
+	</Container>
+
+	<Instance Name="TimerTool">
+		<Container ID="TimerCon" Size="auto,auto">
+			<AlphaAnim ID="TimerAnim" AlphaStart="1" AlphaEnd="1" Size="0,0"  Cycle="Once"  Speed="1"/>
+		</Container>
+	</Instance>
+</Context>
