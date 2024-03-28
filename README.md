@@ -1,5 +1,5 @@
 # 文明6lua计时器
-- [Githp链接](https://github.com/X-PPK/pk-civ6-LuaTimer)
+- [Githp链接](https://github.com/X-PPK/Civilization-6Lua-Timer)
 - [Gitee链接](https://gitee.com/XPPK/pk-civ6-LuaTimer)
 #### 介绍
 在文明6实现更好的lua计时器，用于定时触发其他lua函数，这将是我的大UI框架项目的一部分
