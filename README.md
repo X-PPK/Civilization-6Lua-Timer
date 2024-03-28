@@ -179,7 +179,7 @@ ATnum = 0;
 -- FuncID用于额外的Remove停止循环/延时函数，记得不要为大于0的整数，给予其他字符串
 -- StopTime结束时刻，当为延迟函数时，第StopTime次时结束并运行callbackFunc函数，当是循环函数该参数无效
 -- 也就是你完全可以通过调控speed和StopTime来确定速度
-function AddTimer(callbackFunc, loop, speed, FuncID, StopTime)
+function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values)
     ATnum = ATnum + 1;
     -- 如果loop为nil
     loop = loop or false;
@@ -224,7 +224,7 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime)
     -- callbackFunc插入到定时循环中
     local function CreateLoopFunc()
         return function()
-            callbackFunc();-- 运行需要循环的函数 
+            callbackFunc(Values);-- 运行需要循环的函数 
             play() -- 接着循环
         end
     end
@@ -234,7 +234,7 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime)
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] + 1;
             if AuxiliaryTiming[FuncID] == StopTime then --达到要触发的时候
-                callbackFunc();
+                callbackFunc(Values);
                 CallbackDict[FuncID] = nil;
                 stop()-- 结束
                 return
@@ -276,24 +276,37 @@ end
 
 ------------------------------------------------
 -- 下面就是测试
--- 直接借用文明6游戏内百科按钮测试效果
 -- 注意该测试结果需要可实时加载lua.log,我是使用官方SDK的FireTuner实时查看lua.log
-Events.LoadGameViewStateDone.Add(function()
-    local TargetControl = ContextPtr:LookUpControl("/InGame/TopPanel/RightContents/CivpediaButton");
-    local time, next = 0, 0;
-    TargetControl:RegisterCallback( Mouse.eMClick, function() 
+-- 使用官方SDK的FireTuner运行LuaEvents.PK_TestCode()即可
+function TestCode() 
         
-        AddTimer(function() time = time + 1; print("报时第: ",time) end, true, 0.5, "A"); -- 循环函数A 用于报时间
-        AddTimer(function() next = next + 1; print("第几次: ",next) end, true, 0.5, "B"); -- 循环函数B 用于测试该速度
-        AddTimer(function() print("10秒B变速"); AdjustSpeed("B", 1); end, false, 0.5, "C", 10); -- 延时函数C，在第10秒调整函数B速度
-        AddTimer(function() print("20秒都结束");
-                    RemoveTimer("A");
-                    RemoveTimer("B");
-                    RemoveTimer("C");
-                    RemoveTimer("D");
-                 end, false, 0.5, "D", 20); -- 延时函数D，停止所有函数
-    end);
-end)
+    AddTimer(function() time = time + 1; print("报时第: ",time) end, true, 0.5, "A"); -- 循环函数A 用于报时间
+    AddTimer(function() next = next + 1; print("第几次: ",next) end, true, 0.5, "B"); -- 循环函数B 用于测试该速度
+    AddTimer(function() print("10秒B变速"); AdjustSpeed("B", 1); end, false, 0.5, "C", 10); -- 延时函数C，在第10秒调整函数B速度
+    AddTimer(
+        function() print("20秒都结束");
+            RemoveTimer("A");
+            RemoveTimer("B");
+            RemoveTimer("C");
+            RemoveTimer("D");
+        end,
+        false, 0.5, "D", 20
+    ); -- 延时函数D，停止所有函数
+end
+LuaEvents.PK_TestCode.Add(TestCode);
+------------------------------------------------
+-- 补充,首先感谢号码菌的建议，我前面没有考虑到这一点，现在更新改动加入Values参数
+-- 这里额外讲述一下Values的使用：
+-- 1. 首先Values可以为空(nil)，但这样会给予callbackFunc一个nil参数
+   -- 所以要确保你的callbackFunc要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
+-- 2. 然后Values是作为函数参数传递的，它可以是一个参数直接给予callbackFunc使用
+-- 3. 但如果你需要给予callbackFunc多个参数，那么Values应当作为一个table，
+   -- 你只需要直接这个table按顺序填入要给予callbackFunc的多个参数，然后在callbackFunc函数里有对应的处理方法
+   -- 例如：
+   -- function Func(Values)
+   --     local a,b = Values[1],Values[2]; -- 简单的直接对应的处理方法
+   --     print(a,b)
+   -- end
 ```
 
 ##### xml部分
@@ -389,7 +402,7 @@ CallbackDict = {};
 AuxiliaryTiming = {};
 ATnum = 0;
 
-function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID)
+function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values)
     ATnum = ATnum + 1;
     -- 如果loop为nil
     loop = loop or false;
@@ -411,12 +424,13 @@ function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID)
     print("FuncID为：" ..FuncID) 
     AuxiliaryTiming[FuncID] = TimeInSeconds;
 
+    
     -- callbackFunc插入到定时循环中
     local function CreateLoopFunc()
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] - 1;
             if AuxiliaryTiming[FuncID] == 0 then
-                callbackFunc();
+                callbackFunc(Values);
                 AuxiliaryTiming[FuncID] = TimeInSeconds;
             end
         end
@@ -427,7 +441,7 @@ function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID)
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] - 1;
             if AuxiliaryTiming[FuncID] == 0 then
-                callbackFunc();
+                callbackFunc(Values);
                 Events.GameCoreEventPublishComplete.Remove(CreateFunc());
                 CallbackDict[FuncID] = nil;
             end
@@ -469,6 +483,19 @@ LuaEvents.XXXAddTimer(180, function() print("4秒循环") end, true, "SSS"); -- 
 LuaEvents.XXXAddTimer(1200, function() print("20秒后执行"); LuaEvents.XXXRemoveTimer("SSS"); end, false, "AAA"); -- 延时函数
 
 -- 而include了直接引用XXXAddTimer和XXXRemoveTimer函数
+
+--------------------------------------
+-- 这里额外讲述一下Values的使用：
+-- 1. 首先Values可以为空(nil)，但这样会给予callbackFunc一个nil参数
+   -- 所以要确保你的callbackFunc要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
+-- 2. 然后Values是作为函数参数传递的，它可以是一个参数直接给予callbackFunc使用
+-- 3. 但如果你需要给予callbackFunc多个参数，那么Values应当作为一个table，
+   -- 你只需要直接这个table按顺序填入要给予callbackFunc的多个参数，然后在callbackFunc函数里有对应的处理方法
+   -- 例如：
+   -- function Func(Values)
+   --     local a,b = Values[1],Values[2]; -- 简单的直接对应的处理方法
+   --     print(a,b)
+   -- end
 ```
 ![输入图片说明](%E8%AE%A1%E6%97%B6%E5%99%A8%E6%B5%8B%E8%AF%95mod/1image.png)
 
@@ -517,6 +544,7 @@ end
 - 总之结合自己需求，甚至你只需求延时，那么你完全可以删除循环亦或者你已经完成lua代码确保不会填错参数，那么关于我上面代码参数报错部分可以删除
 ## 总结，
 - 两种方法都准时的,结合实际自行选择
+- 暂时没有考虑存档退出游戏情况下，自动被清除的“在运行中的计时器的函数”在重新加载存档的情况如何自动重新启动，我个人暂时不需要这个功能，你可以使用SetProperty自行改进我的代码，也欢迎来找我进行交流，或者加入我这个项目
 ### UI控件计时优缺点
 - 最大优点是可以直接修改动画控件速度(“SetSpeed”)
 - 你如果本身就是UImod，动画控件计时也是方便的
