@@ -209,12 +209,6 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values, Replace)
             FuncID = ATnum;
         end
     end
-    --[[
-    -- 如果你需要FuncID发生重复自动删除之前的FuncID函数，生成新的FuncID函数可以使用这段
-    if AuxiliaryTiming[FuncID] ~= nil then
-        CallbackDict[FuncID]()
-    end
-    --]]
     -- 如果FuncID为nil
     FuncID = FuncID or ATnum;
     print("FuncID为：" ..FuncID) 
