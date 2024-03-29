@@ -1,5 +1,5 @@
 # 文明6lua计时器
-- [Githp链接](https://github.com/X-PPK/Civilization-6Lua-Timer)
+- [Githp链接](https://github.com/X-PPK/pk-civ6-LuaTimer)
 - [Gitee链接](https://gitee.com/XPPK/pk-civ6-LuaTimer)
 #### 介绍
 在文明6实现更好的lua计时器，用于定时触发其他lua函数，这将是我的大UI框架项目的一部分
@@ -173,13 +173,21 @@ CallbackSpeed = {};
 AuxiliaryTiming = {};
 ATnum = 0;
 
+-- 用于检测FuncID是否重复，或者说也是检测该FuncID函数是否还在运行
+function CheckRun(FuncID)
+    if AuxiliaryTiming[FuncID] ~= nil then return true end
+    return false
+end
+
 -- callbackFunc被延迟/循环的函数
 -- loop是则为循环函数，不是或为nil则函数为延迟函数
 -- speed是计时器速度，如果为nil则默认速度为1秒运行函数1次，既speed=0.5
 -- FuncID用于额外的Remove停止循环/延时函数，记得不要为大于0的整数，给予其他字符串
 -- StopTime结束时刻，当为延迟函数时，第StopTime次时结束并运行callbackFunc函数，当是循环函数该参数无效
+-- Values是函数参数，注意这个参数类型一定要是表，否则报错的，可以为nil，使用详情看这段代码最后面注释
+-- Replace布尔值参数用于确认是否替换原有函数，如果为true则替换原FuncID函数，如果为false则不替换FuncID同名函数
 -- 也就是你完全可以通过调控speed和StopTime来确定速度
-function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values)
+function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values, Replace)
     ATnum = ATnum + 1;
     -- 如果loop为nil
     loop = loop or false;
@@ -191,11 +199,22 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values)
         FuncID = ATnum;
     end
     -- 如果FuncID发生重复
-    if AuxiliaryTiming[FuncID] ~= nil then
-        print("警告FuncID: "..FuncID .."发生重复，如果需要RemoveTimer请更改FuncID，不需要则FuncID应该为空");
-        print("FuncID改为"..ATnum);
-        FuncID = ATnum;
+    if CheckRepeat(FuncID) then
+        if Replace then
+            print("FuncID发生重复，给予替换，清除之前的相同FuncID函数");
+            CallbackDict[FuncID]()
+        else
+            print("FuncID发生重复，请给予其他字符串");
+            print("FuncID改为"..ATnum);
+            FuncID = ATnum;
+        end
     end
+    --[[
+    -- 如果你需要FuncID发生重复自动删除之前的FuncID函数，生成新的FuncID函数可以使用这段
+    if AuxiliaryTiming[FuncID] ~= nil then
+        CallbackDict[FuncID]()
+    end
+    --]]
     -- 如果FuncID为nil
     FuncID = FuncID or ATnum;
     print("FuncID为：" ..FuncID) 
@@ -224,7 +243,7 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values)
     -- callbackFunc插入到定时循环中
     local function CreateLoopFunc()
         return function()
-            callbackFunc(Values);-- 运行需要循环的函数 
+            callbackFunc(unpack(Values));-- 运行需要循环的函数 
             play() -- 接着循环
         end
     end
@@ -234,7 +253,7 @@ function AddTimer(callbackFunc, loop, speed, FuncID, StopTime, Values)
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] + 1;
             if AuxiliaryTiming[FuncID] == StopTime then --达到要触发的时候
-                callbackFunc(Values);
+                callbackFunc(unpack(Values));
                 CallbackDict[FuncID] = nil;
                 stop()-- 结束
                 return
@@ -279,8 +298,8 @@ end
 -- 注意该测试结果需要可实时加载lua.log,我是使用官方SDK的FireTuner实时查看lua.log
 -- 使用官方SDK的FireTuner运行LuaEvents.PK_TestCode()即可
 function TestCode() 
-        
-    AddTimer(function() time = time + 1; print("报时第: ",time) end, true, 0.5, "A"); -- 循环函数A 用于报时间
+
+    AddTimer(function(a) time = time + 1; print(a, time) end, true, 0.5, "A", nil, {"报时第: "}); -- 循环函数A 用于报时间
     AddTimer(function() next = next + 1; print("第几次: ",next) end, true, 0.5, "B"); -- 循环函数B 用于测试该速度
     AddTimer(function() print("10秒B变速"); AdjustSpeed("B", 1); end, false, 0.5, "C", 10); -- 延时函数C，在第10秒调整函数B速度
     AddTimer(
@@ -297,16 +316,13 @@ LuaEvents.PK_TestCode.Add(TestCode);
 ------------------------------------------------
 -- 补充,首先感谢号码菌的建议，我前面没有考虑到这一点，现在更新改动加入Values参数
 -- 这里额外讲述一下Values的使用：
--- 1. 首先Values可以为空(nil)，但这样会给予callbackFunc一个nil参数
-   -- 所以要确保你的callbackFunc要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
--- 2. 然后Values是作为函数参数传递的，它可以是一个参数直接给予callbackFunc使用
--- 3. 但如果你需要给予callbackFunc多个参数，那么Values应当作为一个table，
-   -- 你只需要直接这个table按顺序填入要给予callbackFunc的多个参数，然后在callbackFunc函数里有对应的处理方法
-   -- 例如：
-   -- function Func(Values)
-   --     local a,b = Values[1],Values[2]; -- 简单的直接对应的处理方法
-   --     print(a,b)
-   -- end
+-- 1. 首先Values可以为空(nil)或者是一个表table,千万不要其他类型否则unpack(Values)会保错
+   -- unpack(Values)会自动拆Values表把里面元素作为参数传给callbackFunc
+   -- 所以你需要把你要给的参数都放在Values表里，会自动unpack(Values)给予callbackFunc
+-- 2. 当Values为空(nil)或者是一个空表"{}"时，会给予callbackFunc一个nil参数
+   -- 所以要确保你的callbackFunc，要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
+   -- 如果callbackFunc本身不需要参数，为nil即可，不会影响callbackFunc函数正常运行
+-- 3. 然后如果你要给予callbackFunc参数就是一个表，一定要套一层表，抵消unpack
 ```
 
 ##### xml部分
@@ -330,7 +346,7 @@ LuaEvents.PK_TestCode.Add(TestCode);
 </Context>
 ```
 - 测试结果如下
-![输入图片说明](%E8%AE%A1%E6%97%B6%E5%99%A8%E6%B5%8B%E8%AF%95mod/2image.png)
+![](计时器测试mod/2image.png)
 #### 小扩展
 - 然后动画控件随你游戏设置帧率刷新，而这我发现动画控件还可以插入一个随着帧率刷新调用函数
 - 具体细节忘记了也懒得总结，难不成你要按帧率运行函数？？,大部分玩家电脑顶不住的啊大哥，如果是为了按帧率切换图片实现播放视频，我想说没必要用这个，我有更好方法来实现，直接播放视频的UI控件
@@ -394,15 +410,23 @@ end
 - 如果你的mod很多地方用到计时器为了节省写重复的代码那么你可以使用它
 - 在这里皮凯提供一个较为完善的框架
 ```lua
--- TimeInSeconds需要定时执行的函数和对应时间
--- callbackFunc被延迟/循环的函数
--- loop是则为循环函数，不是或为nil则函数为延迟函数
--- FuncID用于额外的Remove停止循环/延时函数，记得不要为大于0的整数，给予其他字符串
 CallbackDict = {};
 AuxiliaryTiming = {};
 ATnum = 0;
 
-function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values)
+-- 用于检测FuncID是否重复，或者说也是检测该FuncID函数是否还在运行
+function CheckRun(FuncID)
+    if AuxiliaryTiming[FuncID] ~= nil then return true end
+    return false
+end
+
+-- TimeInSeconds需要定时执行的函数和对应时间
+-- callbackFunc被延迟/循环的函数
+-- loop是则为循环函数，不是或为nil则函数为延迟函数
+-- FuncID用于额外的Remove停止循环/延时函数，记得不要为大于0的整数，给予其他字符串
+-- Values是函数参数，注意这个参数类型一定要是表，否则报错的，可以为nil，使用详情看这段代码最后面注释
+-- Replace布尔值参数用于确认是否替换原有函数，如果为true则替换原FuncID函数，如果为false则不替换FuncID同名函数
+function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values, Replace)
     ATnum = ATnum + 1;
     -- 如果loop为nil
     loop = loop or false;
@@ -414,23 +438,29 @@ function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values)
         FuncID = ATnum;
     end
     -- 如果FuncID发生重复
-    if AuxiliaryTiming[FuncID] ~= nil then
-        print("警告FuncID: "..FuncID .."发生重复，如果需要RemoveTimer请更改FuncID，不需要则FuncID应该为空");
-        print("FuncID改为"..ATnum);
-        FuncID = ATnum;
+    if CheckRepeat(FuncID) then
+        if Replace then
+            print("FuncID发生重复，给予替换，清除之前的相同FuncID函数");
+            CallbackDict[FuncID]()
+        else
+            print("FuncID发生重复，请给予其他字符串");
+            print("FuncID改为"..ATnum);
+            FuncID = ATnum;
+        end
     end
     -- 如果FuncID为nil
     FuncID = FuncID or ATnum;
     print("FuncID为：" ..FuncID) 
     AuxiliaryTiming[FuncID] = TimeInSeconds;
 
+    Values = Values or {};
     
     -- callbackFunc插入到定时循环中
     local function CreateLoopFunc()
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] - 1;
             if AuxiliaryTiming[FuncID] == 0 then
-                callbackFunc(Values);
+                callbackFunc(unpack(Values));
                 AuxiliaryTiming[FuncID] = TimeInSeconds;
             end
         end
@@ -441,9 +471,8 @@ function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values)
         return function()
             AuxiliaryTiming[FuncID] = AuxiliaryTiming[FuncID] - 1;
             if AuxiliaryTiming[FuncID] == 0 then
-                callbackFunc(Values);
-                Events.GameCoreEventPublishComplete.Remove(CreateFunc());
-                CallbackDict[FuncID] = nil;
+                callbackFunc(unpack(Values));
+                CallbackDict[FuncID]()
             end
         end
     end
@@ -455,13 +484,16 @@ function AddTimer(TimeInSeconds, callbackFunc, loop, FuncID, Values)
     CallbackDict[FuncID] = function()
         Events.GameCoreEventPublishComplete.Remove(func);
         CallbackDict[FuncID] = nil;
+        AuxiliaryTiming[FuncID] = nil;
     end
     return ATnum;
 end
 -- 这里主要还是关闭循环的函数，亦或者提前关闭延迟的函数，
 -- 如果不需要这个功能请看后续删减版本
 function RemoveTimer(FuncID)
-    CallbackDict[FuncID](); 
+    if CallbackDict[FuncID] then -- 还是要检测一下否则为nil又报错
+        CallbackDict[FuncID](); 
+    end
 end
 --------------------------------------
 -- 接下来就是框架被使用，
@@ -479,25 +511,33 @@ end
 LuaEvents.XXXAddTimer.Add(AddTimer)
 LuaEvents.XXXRemoveTimer.Add(AddTimer)
 -- 当你在其他lua文件或使用该框架例子如下
-LuaEvents.XXXAddTimer(180, function() print("4秒循环") end, true, "SSS"); -- 循环函数
-LuaEvents.XXXAddTimer(1200, function() print("20秒后执行"); LuaEvents.XXXRemoveTimer("SSS"); end, false, "AAA"); -- 延时函数
+LuaEvents.XXXAddTimer(180, function(a) print(a) end, true, "SSS", {"4秒循环"}, false); -- 循环函数
+LuaEvents.XXXAddTimer(1200, function() print("20秒后执行"); LuaEvents.XXXRemoveTimer("SSS"); end, false, "AAA",{}, false); -- 延时函数
 
 -- 而include了直接引用XXXAddTimer和XXXRemoveTimer函数
 
 --------------------------------------
 -- 这里额外讲述一下Values的使用：
--- 1. 首先Values可以为空(nil)，但这样会给予callbackFunc一个nil参数
-   -- 所以要确保你的callbackFunc要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
--- 2. 然后Values是作为函数参数传递的，它可以是一个参数直接给予callbackFunc使用
--- 3. 但如果你需要给予callbackFunc多个参数，那么Values应当作为一个table，
-   -- 你只需要直接这个table按顺序填入要给予callbackFunc的多个参数，然后在callbackFunc函数里有对应的处理方法
-   -- 例如：
-   -- function Func(Values)
-   --     local a,b = Values[1],Values[2]; -- 简单的直接对应的处理方法
-   --     print(a,b)
-   -- end
+-- 1. 首先Values可以为空(nil)或者是一个表table,千万不要其他类型否则unpack(Values)会保错
+   -- unpack(Values)会自动拆Values表把里面元素作为参数传给callbackFunc
+   -- 所以你需要把你要给的参数都放在Values表里，会自动unpack(Values)给予callbackFunc
+-- 2. 当Values为空(nil)或者是一个空表"{}"时，会给予callbackFunc一个nil参数
+   -- 所以要确保你的callbackFunc，要么一开始就不需要参数，要么能接受nil参数，不会导致什么BUG产生
+   -- 如果callbackFunc本身不需要参数，为nil即可，不会影响callbackFunc函数正常运行
+-- 3. 然后如果你要给予callbackFunc参数就是一个表，一定要套一层表，抵消unpack
+
+------------------------------------------------
+-- 下面就是测试
+-- 注意该测试结果需要可实时加载lua.log,我是使用官方SDK的FireTuner实时查看lua.log
+-- 使用官方SDK的FireTuner运行LuaEvents.PK_TestCode()即可
+function TestCode2() 
+
+    AddTimer(180, function(a) print(a) end, true, "SSS", {"4秒循环"}, false); -- 循环函数
+    AddTimer(1200, function() print("20秒后执行"); LuaEvents.XXXRemoveTimer("SSS"); end, false, "AAA",{}, false); -- 延时函数
+end
+LuaEvents.PK_TestCode2.Add(TestCode2);
 ```
-![输入图片说明](%E8%AE%A1%E6%97%B6%E5%99%A8%E6%B5%8B%E8%AF%95mod/1image.png)
+![](计时器测试mod/1image.png)
 
 - 最后补充，你可以根据自己实际需求更改
 - 例如你不需要额外的结束循环，你需要它一直工作，你可以删除CallbackDict和FuncID相关的
@@ -531,14 +571,17 @@ function AddTimer(TimeInSeconds, callbackFunc, loop)
             AuxiliaryTiming[ATnum] = AuxiliaryTiming[ATnum] - 1;
             if AuxiliaryTiming[ATnum] == 0 then
                 callbackFunc();
-                Events.GameCoreEventPublishComplete.Remove(CreateFunc());
-                CallbackDict[ATnum] = nil;
+                CallbackDict[ATnum]()
             end
         end
     end
 
     local func = loop and CreateLoopFunc() or CreateFunc();
     Events.GameCoreEventPublishComplete.Add(func);
+    CallbackDict[ATnum] = function()
+        Events.GameCoreEventPublishComplete.Remove(func);
+        CallbackDict[ATnum] = nil;
+    end
 end
 ```
 - 总之结合自己需求，甚至你只需求延时，那么你完全可以删除循环亦或者你已经完成lua代码确保不会填错参数，那么关于我上面代码参数报错部分可以删除
